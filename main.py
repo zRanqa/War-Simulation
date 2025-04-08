@@ -28,7 +28,7 @@ class Clan():
         self.colorRGB = colorRGB
         self.speed = 100  # Speed for normalization, can be adjusted for faster/slower movement
         self.numFighters = 0
-        self.captain = Captain(coords)
+        self.captain = Captain(coords, self)
         self.fighters = []
         self.lastMove = [0,0]
 
@@ -41,7 +41,7 @@ class Clan():
     def spawnRandomFighter(self):
         primaryClass = random.choice(["t", "d", "a"])
         coords = [self.captain.x + random.randrange(-50,50), self.captain.y + random.randrange(-50,50)]
-        newFighter = Fighter(primaryClass, coords)
+        newFighter = Fighter(primaryClass, coords, self.colorRGB, self)
         self.fighters.append(newFighter)
         self.numFighters += 1
     
@@ -71,9 +71,10 @@ class Clan():
             self.lastMove = normalisedDistance
 
 class Captain():
-    def __init__(self, coords):
-        self.x = float(coords[0])  # Store position as float for smooth movement
-        self.y = float(coords[1])  # Store position as float for smooth movement
+    def __init__(self, coords, clan):
+        self.x = float(coords[0])
+        self.y = float(coords[1])
+        self.clan = clan
         self.rect = pygame.Rect(int(self.x), int(self.y), 20, 20)
 
     def update_rect(self):
@@ -82,8 +83,10 @@ class Captain():
         self.rect.y = round(self.y)
 
 class Fighter():
-    def __init__(self, initClass, coords):
+    def __init__(self, initClass, coords, colorRGB, clan):
         self.fighterClass = initClass
+        self.colorRGB = colorRGB
+        self.clan = clan
         self.x = coords[0]
         self.y = coords[1]
         self.rect = pygame.Rect(0,0,0,0)
@@ -104,6 +107,38 @@ class Fighter():
     def updateRect(self):
         self.rect.x = round(self.x)
         self.rect.y = round(self.y)
+
+    def moveFighter(self, clans):
+        # First check if more than 100 pixels away from captain
+        diff_x, diff_y = self.x - self.clan.captain.x, self.y - self.clan.captain.y
+        distance = math.sqrt(pow(diff_x, 2) * pow(diff_y, 2))
+        print(distance)
+        if distance > 1000:
+            normalised = normalise([diff_x, diff_y])
+            self.x -= normalised[0]
+            self.y -= normalised[1]
+            return
+        # check closest fighter
+        
+        closest_fighter = 0
+        closest_fighter_dist = [0,0]
+        for clan in clans:
+            if self.clan != clan:
+                if closest_fighter == 0 and len(clan.fighters) > 0:
+                    closest_fighter = clan.fighters[0]
+                    diff_x = clan.fighters[0].x - self.x
+                    diff_y = clan.fighters[0].y - self.y
+                    closest_fighter_dist = math.sqrt(pow(diff_x, 2) * pow(diff_y, 2))
+
+                for fighter in clan.fighters:
+                    diff_x = fighter.x - self.x
+                    diff_y = fighter.y - self.y
+                    distance = math.sqrt(pow(diff_x, 2) * pow(diff_y, 2))
+                    if distance < closest_fighter_dist:
+                        closest_fighter = fighter
+                        closest_fighter_dist = distance
+        
+
 
 def normalise(nums):
     x = nums[0]
@@ -156,13 +191,15 @@ while running:
     win.fill(WHITE)
 
     for clan in clans:
-        # Update the captain rect based on floating point position
         clan.captain.update_rect()
 
         win.fill(BLACK, pygame.Rect(clan.captain.rect.x - 2, clan.captain.rect.y - 2, clan.captain.rect.width + 4, clan.captain.rect.height + 4))
         win.fill(clan.colorRGB, clan.captain.rect)
 
         for fighter in clan.fighters:
+            fighter.moveFighter(clans)
+            fighter.updateRect()
+
             win.fill(BLACK, pygame.Rect(fighter.rect.x - 1, fighter.rect.y - 1, fighter.rect.width + 2, fighter.rect.height + 2))
             win.fill(clan.colorRGB, fighter.rect)
 
